@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
+<title>MultiQ+ Detector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --bg:      #080810;
+    --bg2:     #0d0d1a;
+    --bg3:     #111128;
+    --border:  #1e1e3a;
+    --accent:  #00e5ff;
+    --gold:    #ffd54f;
+    --red:     #ff3d57;
+    --green:   #00e676;
+    --amber:   #ffab40;
+    --muted:   #4a4a6a;
+    --text:    #c8c8e8;
+    --mono:    'Share Tech Mono', monospace;
+    --sans:    'Barlow Condensed', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Grille animée en fond */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 12px 12px 80px;
+    min-height: 100dvh;
+  }
+
+  /* ── Header ─────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+
+  .logo {
+    font-family: var(--sans);
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--accent), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .logo span { font-weight: 300; font-size: 11px; display: block; letter-spacing: 4px; margin-top: -2px; color: var(--muted); -webkit-text-fill-color: var(--muted); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .status-dot.demo      { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  /* ── Radar central ───────────────── */
+  .radar-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .radar-wrap {
+    position: relative;
+    width: 220px; height: 220px;
+  }
+
+  #radarCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    border-radius: 50%;
+  }
+
+  .radar-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .vdi-value {
+    font-family: var(--mono);
+    font-size: 42px;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  .vdi-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ── Target type badge ───────────── */
+  .target-badge {
+    margin-top: 12px;
+    padding: 8px 24px;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    border: 1px solid currentColor;
+    transition: all 0.3s;
+    min-width: 200px;
+    text-align: center;
+  }
+
+  /* ── Métriques ───────────────────── */
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .metric-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  .metric-unit {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Barre de signal ─────────────── */
+  .signal-section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+
+  .signal-title {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .freq-bars {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    align-items: end;
+    height: 80px;
+  }
+
+  .freq-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .freq-bar-track {
+    flex: 1;
+    width: 100%;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .freq-bar-fill {
+    width: 100%;
+    border-radius: 3px;
+    transition: height 0.15s ease-out, background 0.3s;
+    min-height: 2px;
+  }
+
+  .freq-bar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .freq-phase {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  /* ── Contrôles ───────────────────── */
+  .controls {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .ctrl-row:last-child { margin-bottom: 0; }
+
+  .ctrl-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    width: 90px;
+    flex-shrink: 0;
+  }
+
+  input[type=range] {
+    flex: 1;
+    appearance: none;
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .ctrl-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    width: 36px;
+    text-align: right;
+    color: var(--accent);
+  }
+
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  button {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 8px;
+    border-radius: 6px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s;
+    outline: none;
+  }
+
+  button:active { transform: scale(0.97); }
+
+  .btn-connect {
+    background: transparent;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-connect:hover { background: rgba(0,229,255,0.1); }
+  .btn-connect.connected { border-color: var(--green); color: var(--green); }
+  .btn-connect.connected:hover { background: rgba(0,230,118,0.1); }
+
+  .btn-gndbal {
+    background: transparent;
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+
+  .btn-gndbal:hover { background: rgba(255,171,64,0.1); }
+
+  .btn-demo {
+    background: transparent;
+    border-color: var(--muted);
+    color: var(--muted);
+    grid-column: 1 / -1;
+    font-size: 11px;
+    padding: 8px;
+  }
+
+  .btn-demo.active { border-color: var(--amber); color: var(--amber); }
+
+  /* ── Ground calibration bar ─────── */
+  .gnd-bar-wrap {
+    display: none;
+    margin-bottom: 10px;
+  }
+
+  .gnd-bar-wrap.visible { display: block; }
+
+  .gnd-bar-track {
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .gnd-bar-fill {
+    height: 100%;
+    background: var(--amber);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.1s;
+  }
+
+  .gnd-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 2px;
+  }
+
+  /* ── Log console ─────────────────── */
+  .log-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    height: 80px;
+    overflow-y: auto;
+    line-height: 1.6;
+  }
+
+  .log-box p { margin: 0; }
+  .log-box p.info  { color: var(--accent); }
+  .log-box p.warn  { color: var(--amber); }
+  .log-box p.ok    { color: var(--green); }
+  .log-box p.err   { color: var(--red); }
+
+  /* ── VDI Scale bar ───────────────── */
+  .vdi-scale {
+    position: relative;
+    height: 28px;
+    background: linear-gradient(to right,
+      #ff3d57 0%, #ff3d57 25%,
+      #ffab40 25%, #ffab40 40%,
+      #ffd54f 40%, #ffd54f 55%,
+      #00e676 55%, #00e676 75%,
+      #00e5ff 75%);
+    border-radius: 6px;
+    margin-bottom: 4px;
+    overflow: visible;
+  }
+
+  .vdi-needle {
+    position: absolute;
+    top: -4px;
+    width: 3px;
+    height: 36px;
+    background: white;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    transition: left 0.2s ease-out;
+    box-shadow: 0 0 6px rgba(255,255,255,0.8);
+  }
+
+  .vdi-scale-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    padding: 0 2px;
+    margin-bottom: 14px;
+  }
+
+  /* ── Tone indicator ─────────────── */
+  .tone-icons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 6px;
+  }
+
+  .tone-icon {
+    font-size: 20px;
+    opacity: 0.25;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  .tone-icon.active {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    /* Already dark */
+  }
+
+  /* Scan animation on detect */
+  @keyframes scanRing {
+    0%   { transform: scale(0.8); opacity: 0.8; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+
+  .scan-ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    transform: translate(-50%, -50%) scale(0.8);
+    pointer-events: none;
+    animation: scanRing 1.2s ease-out infinite;
+  }
+  /* ── 2D ID MAP ───────────────────── */
+  .map2d-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+  .map2d-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .map2d-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+  .map2d-clear {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .map2d-clear:active { color: var(--accent); border-color: var(--accent); }
+  #mapCanvas2d {
+    width: 100%;
+    height: 240px;
+    display: block;
+    border-radius: 6px;
+  }
+  .map2d-legend {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 7px;
+    justify-content: center;
+  }
+  .map2d-leg-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+  }
+  .map2d-leg-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+  .panel3d-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 10px 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .panel3d-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .panel3d-inner { position: relative; }
+  #canvas3d {
+    width: 100%;
+    height: 220px;
+    border-radius: 8px;
+    display: block;
+  }
+  .panel3d-ruler {
+    position: absolute;
+    right: 4px; top: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    pointer-events: none;
+    padding: 4px 0;
+  }
+  .panel3d-info {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-align: center;
+    color: var(--muted);
+    margin-top: 5px;
+    letter-spacing: 1px;
+    min-height: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      MultiQ+
+      <span>MULTI-FREQ DETECTOR</span>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText" style="font-family:var(--mono)">DÉCO.</span>
+    </div>
+  </header>
+
+  <!-- VDI Scale -->
+  <div class="vdi-scale">
+    <div class="vdi-needle" id="vdiNeedle"></div>
+  </div>
+  <div class="vdi-scale-labels">
+    <span>−99 FER</span><span>MINERAI</span><span>OR</span><span>ARGENT</span><span>+99 CU</span>
+  </div>
+
+  <!-- Radar + VDI -->
+  <div class="radar-section">
+    <div class="radar-wrap">
+      <canvas id="radarCanvas" width="220" height="220"></canvas>
+      <div id="scanRingEl" class="scan-ring" style="display:none"></div>
+      <div class="radar-center">
+        <div class="vdi-value" id="vdiVal" style="color:var(--muted)">0</div>
+        <div class="vdi-label">VDI</div>
+      </div>
+    </div>
+    <div class="target-badge" id="targetBadge" style="color:var(--muted);border-color:var(--muted)">
+      EN ATTENTE
+    </div>
+    <div class="tone-icons">
+      <span class="tone-icon" id="t1" title="Fer">🔩</span>
+      <span class="tone-icon" id="t2" title="Mixte">⚙️</span>
+      <span class="tone-icon" id="t3" title="Or/Argent">🥇</span>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-val" id="depthVal" style="color:var(--accent)">—</div>
+      <div class="metric-unit">cm</div>
+      <div class="metric-label">Profondeur</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="sigVal" style="color:var(--green)">—</div>
+      <div class="metric-unit">%</div>
+      <div class="metric-label">Signal</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="confVal" style="color:var(--gold)">—</div>
+      <div class="metric-unit">%</div>
+      <div class="metric-label">Fiabilité</div>
+    </div>
+  </div>
+
+  <!-- 2D ID MAP — style Manticore Target Trace -->
+  <div class="map2d-wrap">
+    <div class="map2d-header">
+      <div class="map2d-title">◈ 2D TARGET TRACE</div>
+      <button class="map2d-clear" id="btnClearMap" onclick="clearMap2D()">⌫ CLEAR</button>
+    </div>
+    <canvas id="mapCanvas2d"></canvas>
+    <div class="map2d-legend">
+      <div class="map2d-leg-item"><div class="map2d-leg-dot" style="background:#ff4444"></div>FER/CLOU</div>
+      <div class="map2d-leg-item"><div class="map2d-leg-dot" style="background:#ff8800"></div>FEUILLE</div>
+      <div class="map2d-leg-item"><div class="map2d-leg-dot" style="background:#ffd54f"></div>OR</div>
+      <div class="map2d-leg-item"><div class="map2d-leg-dot" style="background:#00e5ff"></div>MONNAIE</div>
+      <div class="map2d-leg-item"><div class="map2d-leg-dot" style="background:#00e676"></div>ARGENT/CU</div>
+    </div>
+  </div>
+
+  <!-- Frequency bars -->
+
+  <div class="signal-section">
+    <div class="signal-title">◈ Analyse fréquentielle</div>
+    <div class="freq-bars" id="freqBars">
+      <div class="freq-bar-wrap">
+        <div class="freq-bar-track"><div class="freq-bar-fill" id="bar0" style="height:2%;background:var(--accent)"></div></div>
+        <div class="freq-bar-label">2.5k</div>
+        <div class="freq-phase" id="ph0">0°</div>
+      </div>
+      <div class="freq-bar-wrap">
+        <div class="freq-bar-track"><div class="freq-bar-fill" id="bar1" style="height:2%;background:var(--accent)"></div></div>
+        <div class="freq-bar-label">5k</div>
+        <div class="freq-phase" id="ph1">0°</div>
+      </div>
+      <div class="freq-bar-wrap">
+        <div class="freq-bar-track"><div class="freq-bar-fill" id="bar2" style="height:2%;background:var(--gold)"></div></div>
+        <div class="freq-bar-label">10k</div>
+        <div class="freq-phase" id="ph2">0°</div>
+      </div>
+      <div class="freq-bar-wrap">
+        <div class="freq-bar-track"><div class="freq-bar-fill" id="bar3" style="height:2%;background:var(--gold)"></div></div>
+        <div class="freq-bar-label">20k</div>
+        <div class="freq-phase" id="ph3">0°</div>
+      </div>
+      <div class="freq-bar-wrap">
+        <div class="freq-bar-track"><div class="freq-bar-fill" id="bar4" style="height:2%;background:var(--green)"></div></div>
+        <div class="freq-bar-label">35k</div>
+        <div class="freq-phase" id="ph4">0°</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ground balance bar -->
+  <div class="gnd-bar-wrap" id="gndBarWrap">
+    <div class="gnd-label" id="gndLabel">⚡ CALIBRATION SOL... 0%</div>
+    <div class="gnd-bar-track"><div class="gnd-bar-fill" id="gndBarFill"></div></div>
+  </div>
+
+  <!-- 3D Target View -->
+  <div class="panel3d-wrap">
+    <div class="panel3d-title">◈ VUE 3D CIBLE</div>
+    <div class="panel3d-inner">
+      <canvas id="canvas3d"></canvas>
+      <div class="panel3d-ruler">
+        <span>0 cm</span>
+        <span>15</span>
+        <span>30</span>
+        <span>45</span>
+        <span>60 cm</span>
+      </div>
+    </div>
+    <div class="panel3d-info" id="info3d">EN ATTENTE DE SIGNAL</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="ctrl-row">
+      <span class="ctrl-label">Sensibilité</span>
+      <input type="range" min="25" max="100" value="65" id="sensSlider">
+      <span class="ctrl-val" id="sensVal">65</span>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button class="btn-connect" id="btnConnect" onclick="toggleConnect()">⚡ BLE</button>
+    <button class="btn-gndbal" id="btnGndBal" onclick="groundBalance()">⊛ SOL</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn-demo" id="btnDemo" onclick="toggleDemo()">▶ MODE DÉMO (sans hardware)</button>
+  </div>
+
+  <!-- Log -->
+  <div class="log-box" id="logBox">
+    <p class="info">[ MultiQ+ Detector v1.0 ]</p>
+    <p>BLE: connectez l'ESP32-S3 ou activez le mode démo</p>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+const state = {
+  connected: false,
+  demo: false,
+  vdi: 0,
+  depth: 0,
+  signal: 0,
+  confidence: 0,
+  tone: 0,
+  phases: [0,0,0,0,0],
+  amps:   [0,0,0,0,0],
+  gndCalib: false,
+  gndPct: 0,
+  sensitivity: 65,
+};
+
+let bleDevice = null, bleServer = null, bleNotifyChar = null, bleTxChar = null;
+let demoInterval = null;
+let demoTargetTimer = 0;
+let demoTarget = null;
+
+// NUS UUIDs
+const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_TX      = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_RX      = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+// ═══════════════════════════════════════════════════════
+//  RADAR CANVAS
+// ═══════════════════════════════════════════════════════
+const canvas  = document.getElementById('radarCanvas');
+const ctx     = canvas.getContext('2d');
+const W = 220, H = 220, CX = 110, CY = 110, R = 100;
+
+let radarAngle = 0;
+
+function drawRadar(ampNorm) {
+  ctx.clearRect(0, 0, W, H);
+
+  // Background circle
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI * 2);
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fill();
+
+  // Rings
+  const rings = [0.25, 0.5, 0.75, 1.0];
+  rings.forEach(f => {
+    ctx.beginPath();
+    ctx.arc(CX, CY, R * f, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(30,30,58,${f < 1 ? 0.8 : 0})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // Cross lines
+  ctx.strokeStyle = 'rgba(30,30,58,0.8)';
+  ctx.lineWidth = 1;
+  [0, Math.PI/2, Math.PI, Math.PI*3/2].forEach(a => {
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(a)*10, CY + Math.sin(a)*10);
+    ctx.lineTo(CX + Math.cos(a)*R,  CY + Math.sin(a)*R);
+    ctx.stroke();
+  });
+
+  // Sweep line
+  const grad = ctx.createConicalGradient
+    ? null
+    : null;
+  // Draw a sweep sector
+  const sweepLen = Math.PI * 0.4;
+  const sweepGrad = ctx.createLinearGradient(
+    CX + Math.cos(radarAngle) * R,
+    CY + Math.sin(radarAngle) * R,
+    CX, CY
+  );
+  sweepGrad.addColorStop(0, 'rgba(0,229,255,0.0)');
+  sweepGrad.addColorStop(1, 'rgba(0,229,255,0.15)');
+
+  ctx.beginPath();
+  ctx.moveTo(CX, CY);
+  ctx.arc(CX, CY, R - 2, radarAngle - sweepLen, radarAngle);
+  ctx.closePath();
+  ctx.fillStyle = sweepGrad;
+  ctx.fill();
+
+  // Sweep line tip
+  ctx.beginPath();
+  ctx.moveTo(CX, CY);
+  ctx.lineTo(CX + Math.cos(radarAngle)*R, CY + Math.sin(radarAngle)*R);
+  ctx.strokeStyle = 'rgba(0,229,255,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Signal blob (if detecting)
+  if (ampNorm > 0.05) {
+    const blobR = 8 + ampNorm * 30;
+    const blobGrad = ctx.createRadialGradient(CX, CY, 0, CX, CY, blobR);
+    const col = getTargetColor(state.vdi);
+    blobGrad.addColorStop(0, col.replace(')', ', 0.7)').replace('rgb', 'rgba'));
+    blobGrad.addColorStop(1, col.replace(')', ', 0)').replace('rgb', 'rgba'));
+    ctx.beginPath();
+    ctx.arc(CX, CY, blobR, 0, Math.PI * 2);
+    ctx.fillStyle = blobGrad;
+    ctx.fill();
+  }
+
+  // Border ring
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  radarAngle = (radarAngle + 0.06) % (Math.PI * 2);
+}
+
+function getTargetColor(vdi) {
+  if (vdi < -15) return 'rgb(255,61,87)';
+  if (vdi < 5)   return 'rgb(255,171,64)';
+  if (vdi < 40)  return 'rgb(255,213,79)';
+  return 'rgb(0,230,118)';
+}
+
+// ═══════════════════════════════════════════════════════
+//  UI UPDATE
+// ═══════════════════════════════════════════════════════
+function updateUI() {
+  const s = state;
+  const ampNorm = s.signal / 100;
+  const detecting = s.signal > 3;
+
+  // VDI needle (left=−99, right=+99)
+  const pct = (s.vdi + 99) / 198 * 100;
+  document.getElementById('vdiNeedle').style.left = pct + '%';
+
+  // VDI value
+  const vdiEl = document.getElementById('vdiVal');
+  vdiEl.textContent = detecting ? s.vdi : '0';
+  vdiEl.style.color = detecting ? getTargetColor(s.vdi) : 'var(--muted)';
+
+  // Badge
+  const badge = document.getElementById('targetBadge');
+  if (!detecting) {
+    badge.textContent = 'EN ATTENTE';
+    badge.style.color = 'var(--muted)';
+    badge.style.borderColor = 'var(--muted)';
+  } else if (s.vdi < -15) {
+    badge.textContent = '⚠ FERREUX';
+    badge.style.color = 'var(--red)';
+    badge.style.borderColor = 'var(--red)';
+  } else if (s.vdi < 5) {
+    badge.textContent = '◈ MINERAI';
+    badge.style.color = 'var(--amber)';
+    badge.style.borderColor = 'var(--amber)';
+  } else if (s.vdi < 40) {
+    badge.textContent = '★ OR';
+    badge.style.color = 'var(--gold)';
+    badge.style.borderColor = 'var(--gold)';
+  } else {
+    badge.textContent = '◆ ARGENT/CU';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'var(--green)';
+  }
+
+  // Metrics
+  document.getElementById('depthVal').textContent = detecting ? s.depth : '—';
+  document.getElementById('sigVal').textContent    = detecting ? s.signal : '—';
+  document.getElementById('confVal').textContent   = detecting ? s.confidence : '—';
+
+  // Freq bars
+  const maxAmp = Math.max(...s.amps, 1);
+  const barColors = ['var(--accent)','var(--accent)','var(--gold)','var(--gold)','var(--green)'];
+  for (let i = 0; i < 5; i++) {
+    const bar = document.getElementById('bar'+i);
+    const ph  = document.getElementById('ph'+i);
+    if (!bar || !ph) continue;
+    const pct = Math.min(95, (s.amps[i] / maxAmp) * 95 + 2);
+    bar.style.height     = pct + '%';
+    bar.style.background = barColors[i];
+    const deg = Math.round(s.phases[i] * 180 / Math.PI);
+    ph.textContent = deg + '°';
+  }
+
+  // Tone icons
+  ['t1','t2','t3'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('active', s.tone === i+1 && detecting);
+  });
+
+  // Scan ring
+  const scanRing = document.getElementById('scanRingEl');
+  scanRing.style.display = detecting ? 'block' : 'none';
+  if (detecting) {
+    scanRing.style.borderColor = getTargetColor(s.vdi);
+  }
+
+  // Ground bar
+  const gndWrap = document.getElementById('gndBarWrap');
+  if (!s.gndCalib && s.gndPct < 100) {
+    gndWrap.classList.add('visible');
+    document.getElementById('gndBarFill').style.width = s.gndPct + '%';
+    document.getElementById('gndLabel').textContent = `⚡ CALIBRATION SOL... ${Math.round(s.gndPct)}%`;
+  } else {
+    gndWrap.classList.remove('visible');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  BLE PARSING  (target_data_t binaire)
+// ═══════════════════════════════════════════════════════
+function parsePacket(buf) {
+  const view = new DataView(buf);
+  let off = 0;
+
+  state.vdi        = view.getInt8(off++);
+  state.confidence = view.getUint8(off++);
+  state.depth      = view.getUint8(off++);
+  state.signal     = Math.round(view.getUint8(off++) / 2.55);
+
+  // phase_mrad (5 × int16)
+  for (let i = 0; i < 5; i++) {
+    state.phases[i] = view.getInt16(off, true) / 1000.0;
+    off += 2;
+  }
+  // amp (5 × uint16)
+  for (let i = 0; i < 5; i++) {
+    state.amps[i] = view.getUint16(off, true);
+    off += 2;
+  }
+
+  state.tone       = view.getUint8(off++);
+  const flags      = view.getUint8(off++);
+  state.gndCalib   = view.getUint8(off++) === 1;
+}
+
+// ═══════════════════════════════════════════════════════
+//  BLE CONNECT
+// ═══════════════════════════════════════════════════════
+async function toggleConnect() {
+  if (state.connected) {
+    bleDevice?.gatt?.disconnect();
+    setConnected(false);
+    log('Déconnecté', 'warn');
+    return;
+  }
+
+  if (!navigator.bluetooth) {
+    log('❌ Web Bluetooth non dispo (Android Chrome requis)', 'err');
+    return;
+  }
+
+  try {
+    log('Recherche BLE...', 'info');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'MetalDet-MULTIQ' }],
+      optionalServices: [NUS_SERVICE]
+    });
+
+    bleDevice.addEventListener('gattserverdisconnected', () => {
+      setConnected(false);
+      log('Déconnecté (BLE)', 'warn');
+    });
+
+    bleServer = await bleDevice.gatt.connect();
+    const svc = await bleServer.getPrimaryService(NUS_SERVICE);
+
+    bleNotifyChar = await svc.getCharacteristic(NUS_TX);
+    bleTxChar     = await svc.getCharacteristic(NUS_RX);
+
+    await bleNotifyChar.startNotifications();
+    bleNotifyChar.addEventListener('characteristicvaluechanged', (e) => {
+      parsePacket(e.target.value.buffer);
+    });
+
+    setConnected(true);
+    log('✓ Connecté à MetalDet-MULTIQ', 'ok');
+    sendSensitivity(state.sensitivity);
+
+  } catch(e) {
+    log('BLE erreur: ' + e.message, 'err');
+  }
+}
+
+function setConnected(v) {
+  state.connected = v;
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  const btn = document.getElementById('btnConnect');
+  dot.className = 'status-dot' + (v ? ' connected' : '');
+  txt.textContent = v ? 'BLE' : 'DÉCO.';
+  btn.textContent = v ? '✕ BLE' : '⚡ BLE';
+  btn.className = 'btn-connect' + (v ? ' connected' : '');
+}
+
+async function sendCmd(bytes) {
+  if (!bleTxChar) return;
+  await bleTxChar.writeValueWithoutResponse(new Uint8Array(bytes));
+}
+
+async function groundBalance() {
+  if (state.connected) {
+    await sendCmd([0x47]); // 'G'
+    log('⊛ Balance sol lancée', 'warn');
+  }
+  state.gndCalib = false;
+  state.gndPct = 0;
+  log('Balance sol: calibration en cours...', 'warn');
+}
+
+function sendSensitivity(v) {
+  if (state.connected) sendCmd([0x53, v]); // 'S', valeur
+}
+
+// ═══════════════════════════════════════════════════════
+//  DÉMO MODE
+// ═══════════════════════════════════════════════════════
+const DEMO_TARGETS = [
+  { name:'FERREUX',   vdi:-60, depth:8,  conf:88, amps:[3200,2800,2200,1500,900],  phases:[-0.9,-1.4,-1.9,-2.3,-2.6] },
+  { name:'OR',        vdi:45,  depth:12, conf:72, amps:[1800,2100,2400,2100,1900], phases:[0.6,0.55,0.5,0.48,0.45] },
+  { name:'ARGENT/CU', vdi:85,  depth:6,  conf:95, amps:[4100,4300,4000,3600,3200], phases:[1.1,1.0,0.95,0.9,0.85] },
+  { name:'MINERAI',   vdi:-5,  depth:20, conf:55, amps:[900,1100,1300,1200,1000],  phases:[-0.2,-0.25,-0.3,-0.35,-0.38] },
+];
+
+function toggleDemo() {
+  state.demo = !state.demo;
+  const btn = document.getElementById('btnDemo');
+
+  if (state.demo) {
+    btn.textContent = '⏹ STOP DÉMO';
+    btn.classList.add('active');
+    document.getElementById('statusDot').className = 'status-dot demo';
+    document.getElementById('statusText').textContent = 'DÉMO';
+    log('▶ Mode démo activé', 'warn');
+
+    // Ground balance anim
+    state.gndCalib = false; state.gndPct = 0;
+    let gp = 0;
+    const gndInt = setInterval(() => {
+      gp += 100/30;
+      state.gndPct = Math.min(100, gp);
+      if (gp >= 100) { state.gndCalib = true; clearInterval(gndInt); log('✓ Balance sol OK', 'ok'); }
+    }, 100);
+
+    runDemo();
+  } else {
+    btn.textContent = '▶ MODE DÉMO (sans hardware)';
+    btn.classList.remove('active');
+    clearInterval(demoInterval);
+    demoInterval = null;
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = 'DÉCO.';
+    state.signal = 0; state.vdi = 0;
+    log('⏹ Démo arrêtée', '');
+  }
+}
+
+function runDemo() {
+  let t = 0;
+  let targetIdx = -1;
+  let targetActive = false;
+  let targetEnvelope = 0;
+
+  demoInterval = setInterval(() => {
+    t++;
+
+    // Changer de cible toutes les ~4s
+    if (t % 80 === 0) {
+      targetIdx = (Math.random() < 0.6) ? Math.floor(Math.random() * DEMO_TARGETS.length) : -1;
+      targetActive = targetIdx >= 0;
+    }
+
+    if (targetActive && targetIdx >= 0) {
+      const tgt = DEMO_TARGETS[targetIdx];
+      targetEnvelope = Math.min(1, targetEnvelope + 0.08);
+
+      const noise = () => (Math.random() - 0.5) * 0.04;
+      state.vdi        = Math.round(tgt.vdi * targetEnvelope + noise() * 10);
+      state.depth      = Math.round(tgt.depth);
+      state.confidence = Math.round(tgt.conf * targetEnvelope);
+      state.signal     = Math.round(70 * targetEnvelope + Math.random() * 15);
+      for (let i = 0; i < 5; i++) {
+        state.amps[i]   = Math.round(tgt.amps[i] * targetEnvelope * (1 + noise()));
+        state.phases[i] = tgt.phases[i] * targetEnvelope + noise();
+      }
+      if      (state.vdi < -15) state.tone = 1;
+      else if (state.vdi < 30)  state.tone = 2;
+      else                       state.tone = 3;
+    } else {
+      targetEnvelope = Math.max(0, targetEnvelope - 0.12);
+      const decay = 1 - (1 - targetEnvelope);
+      state.signal = Math.round(state.signal * 0.6);
+      state.confidence = Math.round(state.confidence * 0.7);
+      if (state.signal < 5) { state.signal = 0; state.vdi = 0; state.tone = 0; }
+      for (let i = 0; i < 5; i++) {
+        state.amps[i]   = Math.round(state.amps[i] * 0.7);
+        state.phases[i] *= 0.8;
+      }
+    }
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SENSITIVITY SLIDER
+// ═══════════════════════════════════════════════════════
+document.getElementById('sensSlider').addEventListener('input', function() {
+  state.sensitivity = parseInt(this.value);
+  document.getElementById('sensVal').textContent = state.sensitivity;
+  sendSensitivity(state.sensitivity);
+});
+
+// ═══════════════════════════════════════════════════════
+//  LOG
+// ═══════════════════════════════════════════════════════
+function log(msg, cls = '') {
+  const box = document.getElementById('logBox');
+  const p   = document.createElement('p');
+  if (cls) p.className = cls;
+  p.textContent = '> ' + msg;
+  box.appendChild(p);
+  box.scrollTop = box.scrollHeight;
+  while (box.children.length > 30) box.removeChild(box.firstChild);
+}
+
+// ═══════════════════════════════════════════════════════
+//  2D ID MAP — Style Minelab Manticore Target Trace
+// ═══════════════════════════════════════════════════════
+(function initMap2D() {
+
+  const el   = document.getElementById('mapCanvas2d');
+  const DPR  = Math.min(window.devicePixelRatio || 1, 2);
+
+  // Defer sizing until element is rendered
+  requestAnimationFrame(() => {
+    const CW = el.clientWidth;
+    const CH = 240;
+    el.width  = CW * DPR;
+    el.height = CH * DPR;
+
+    const ctx = el.getContext('2d');
+    ctx.scale(DPR, DPR);
+
+    // ── Layout ──────────────────────────────────────────
+    const PAD = { top: 12, right: 14, bottom: 30, left: 38 };
+    const MW  = CW - PAD.left - PAD.right;  // map inner width
+    const MH  = CH - PAD.top  - PAD.bottom; // map inner height
+
+    // ── Zones ───────────────────────────────────────────
+    // Each zone: [x0,x1] conductivity 0-1, [y0,y1] ferrous 0-1
+    // y=1 = TOP of map = HIGH ferrous (iron)
+    // y=0 = BOTTOM = LOW ferrous (non-ferrous)
+    const ZONES = [
+      { x0:0,    x1:0.42, y0:0.58, y1:1,    bg:'rgba(200,40,40,0.14)',  label:'FER / CLOU',    col:'#ff5555' },
+      { x0:0.42, x1:1,    y0:0.65, y1:1,    bg:'rgba(160,30,10,0.10)',  label:'FER LARGE',     col:'#ff7744' },
+      { x0:0,    x1:0.20, y0:0,    y1:0.58, bg:'rgba(160,90,0,0.12)',   label:'FEUILLE',       col:'#ffaa33' },
+      { x0:0.20, x1:0.44, y0:0.22, y1:0.58, bg:'rgba(140,100,0,0.10)',  label:'PULL-TAB',      col:'#ffcc55' },
+      { x0:0.18, x1:0.50, y0:0,    y1:0.22, bg:'rgba(160,130,0,0.15)',  label:'OR',            col:'#ffd54f' },
+      { x0:0.50, x1:0.80, y0:0,    y1:0.32, bg:'rgba(0,120,160,0.13)',  label:'MONNAIE',       col:'#00e5ff' },
+      { x0:0.80, x1:1,    y0:0,    y1:0.38, bg:'rgba(0,150,80,0.14)',   label:'ARGENT / CU',   col:'#00e676' },
+    ];
+
+    // ── Dot trail storage ────────────────────────────────
+    const dots = []; // { nx, ny, col, life }
+    const MAX_DOTS = 120;
+    const FADE_RATE = 0.004; // ~250 frames ≈ 4s at 60fps
+
+    // ── Helper: map data → canvas XY ────────────────────
+    function toCanvas(nx, ny) {
+      return {
+        x: PAD.left + nx * MW,
+        y: PAD.top  + (1 - ny) * MH   // y=1 → top
+      };
+    }
+
+    // ── Compute ferrous (0-1) from state ────────────────
+    function computeFerrous() {
+      // Use phase differential: 2.5kHz vs 35kHz
+      // Ferreux → phase drops a lot between low & high freq
+      const phaseDiff = state.phases[0] - state.phases[4];
+      // Also use VDI: iron = vdi << 0, silver = vdi >> 0
+      const vdiNorm = (state.vdi + 99) / 198; // 0=iron, 1=silver
+      const phaseFerrous = Math.max(0, Math.min(1, 0.5 + phaseDiff * 0.55));
+      const vdiFerrous   = 1 - vdiNorm;
+      // Blend: 60% phase-derived, 40% vdi-derived
+      return vdiFerrous * 0.4 + phaseFerrous * 0.6;
+    }
+
+    // ── Compute conductivity (0-1) from state ───────────
+    function computeConductivity() {
+      return Math.max(0, Math.min(1, (state.vdi + 99) / 198));
+    }
+
+    // ── Get dot color from position ──────────────────────
+    function getDotColor(nx, ny) {
+      for (const z of ZONES) {
+        if (nx >= z.x0 && nx <= z.x1 && ny >= z.y0 && ny <= z.y1)
+          return z.col;
+      }
+      return '#c8c8e8';
+    }
+
+    // ── Draw background (zones + grid + labels) ──────────
+    function drawBackground() {
+      ctx.clearRect(0, 0, CW, CH);
+
+      // Map background
+      ctx.fillStyle = '#050510';
+      ctx.fillRect(PAD.left, PAD.top, MW, MH);
+
+      // Zone fills
+      ZONES.forEach(z => {
+        const x  = PAD.left + z.x0 * MW;
+        const y  = PAD.top  + (1 - z.y1) * MH;
+        const w  = (z.x1 - z.x0) * MW;
+        const h  = (z.y1 - z.y0) * MH;
+        ctx.fillStyle = z.bg;
+        ctx.fillRect(x, y, w, h);
+      });
+
+      // Zone borders (subtle)
+      ctx.strokeStyle = 'rgba(30,30,60,0.6)';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([3, 4]);
+      ZONES.forEach(z => {
+        const x = PAD.left + z.x0 * MW;
+        const y = PAD.top  + (1 - z.y1) * MH;
+        const w = (z.x1 - z.x0) * MW;
+        const h = (z.y1 - z.y0) * MH;
+        ctx.strokeRect(x, y, w, h);
+      });
+      ctx.setLineDash([]);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(20,20,50,0.9)';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= 10; i++) {
+        const x = PAD.left + (i / 10) * MW;
+        ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + MH); ctx.stroke();
+        const y = PAD.top + (i / 10) * MH;
+        ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + MW, y); ctx.stroke();
+      }
+
+      // Map border
+      ctx.strokeStyle = 'rgba(30,30,58,1)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(PAD.left, PAD.top, MW, MH);
+
+      // Zone labels
+      ctx.font = 'bold 8px monospace';
+      ZONES.forEach(z => {
+        const x = PAD.left + (z.x0 + 0.02) * MW;
+        const y = PAD.top  + (1 - z.y1 + 0.04) * MH + 9;
+        ctx.fillStyle = z.col + '99'; // semi-transparent
+        ctx.fillText(z.label, x, y);
+      });
+
+      // X axis — conductivité
+      ctx.font = '8px monospace';
+      ctx.fillStyle = '#3a3a5a';
+      ctx.textAlign = 'center';
+      [0, 25, 50, 75, 99].forEach(v => {
+        const x = PAD.left + (v / 99) * MW;
+        ctx.fillText(v, x, PAD.top + MH + 12);
+      });
+      ctx.fillStyle = '#2a2a4a';
+      ctx.fillText('← CONDUCTIVITÉ →', PAD.left + MW / 2, PAD.top + MH + 24);
+
+      // Y axis — teneur en fer
+      ctx.textAlign = 'right';
+      ctx.save();
+      ctx.translate(PAD.left - 6, PAD.top + MH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('TENEUR EN FER', 0, 0);
+      ctx.restore();
+
+      ctx.fillStyle = '#3a3a5a';
+      ctx.textAlign = 'right';
+      ctx.fillText('99', PAD.left - 3, PAD.top + 10);
+      ctx.fillText('0',  PAD.left - 3, PAD.top + MH + 4);
+    }
+
+    // ── Draw all dots ────────────────────────────────────
+    function drawDots() {
+      dots.forEach(d => {
+        const { x, y } = toCanvas(d.nx, d.ny);
+        const signal = d.sig || 0.5;
+        const r = 2.5 + signal * 5;
+        const alpha = d.life;
+
+        // Outer glow
+        const grd = ctx.createRadialGradient(x, y, 0, x, y, r * 2.5);
+        const hex  = d.col;
+        grd.addColorStop(0, hex + Math.round(alpha * 99).toString(16).padStart(2,'0'));
+        grd.addColorStop(1, hex + '00');
+        ctx.beginPath();
+        ctx.arc(x, y, r * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+
+        // Core dot
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = hex + Math.round(alpha * 220).toString(16).padStart(2,'0');
+        ctx.fill();
+
+        // Bright center
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff' + Math.round(alpha * 180).toString(16).padStart(2,'0');
+        ctx.fill();
+      });
+    }
+
+    // ── Draw crosshair at current position ───────────────
+    function drawCrosshair(nx, ny, signal) {
+      const { x, y } = toCanvas(nx, ny);
+      const col = getDotColor(nx, ny);
+      const a = 0.7 + Math.sin(Date.now() / 200) * 0.3;
+
+      ctx.strokeStyle = col + Math.round(a * 200).toString(16).padStart(2,'0');
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+
+      // Horizontal line
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, y);
+      ctx.lineTo(PAD.left + MW, y);
+      ctx.stroke();
+
+      // Vertical line
+      ctx.beginPath();
+      ctx.moveTo(x, PAD.top);
+      ctx.lineTo(x, PAD.top + MH);
+      ctx.stroke();
+
+      ctx.setLineDash([]);
+
+      // Central circle
+      const r = 5 + signal * 8;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // VDI text
+      const vdiLabel = `VDI ${state.vdi > 0 ? '+' : ''}${state.vdi}`;
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = x > MW * 0.7 ? 'right' : 'left';
+      const lx = x > MW * 0.7 ? x - r - 4 : x + r + 4;
+      ctx.fillStyle = col;
+      ctx.fillText(vdiLabel, lx, y - 4);
+
+      // Ferrous % text
+      const ferPct = Math.round(ny * 99);
+      ctx.fillText(`Fe:${ferPct}`, lx, y + 12);
+    }
+
+    // ── Tick: update dots + redraw ───────────────────────
+    let addDotTimer = 0;
+    const ADD_INTERVAL = 4; // add dot every 4 frames when detecting
+
+    window.update2DMap = function() {
+      const detecting  = state.signal > 3;
+      const conductivity = computeConductivity();
+      const ferrous      = computeFerrous();
+      const signalNorm   = state.signal / 100;
+
+      // Age all existing dots
+      for (let i = dots.length - 1; i >= 0; i--) {
+        dots[i].life -= FADE_RATE;
+        if (dots[i].life <= 0) dots.splice(i, 1);
+      }
+
+      // Add new dot when detecting
+      if (detecting) {
+        addDotTimer++;
+        if (addDotTimer % ADD_INTERVAL === 0) {
+          // Small jitter (real detector has noise)
+          const nx = Math.max(0, Math.min(1, conductivity + (Math.random() - 0.5) * 0.015));
+          const ny = Math.max(0, Math.min(1, ferrous      + (Math.random() - 0.5) * 0.015));
+          const col = getDotColor(nx, ny);
+
+          dots.push({ nx, ny, col, life: 1.0, sig: signalNorm });
+          if (dots.length > MAX_DOTS) dots.shift();
+        }
+      }
+
+      // Draw
+      drawBackground();
+      drawDots();
+      if (detecting) drawCrosshair(conductivity, ferrous, signalNorm);
+    };
+
+    window.clearMap2D = function() {
+      dots.length = 0;
+      log('◈ Carte 2D effacée', '');
+    };
+  });
+
+})();
+
+
+(function init3D() {
+  const canvas3d = document.getElementById('canvas3d');
+  const W3 = canvas3d.clientWidth || 400;
+  const H3 = 220;
+  canvas3d.width  = W3 * Math.min(window.devicePixelRatio, 2);
+  canvas3d.height = H3 * Math.min(window.devicePixelRatio, 2);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05050e);
+  scene.fog = new THREE.FogExp2(0x05050e, 0.12);
+
+  const camera = new THREE.PerspectiveCamera(48, W3 / H3, 0.1, 100);
+  camera.position.set(0, 3.8, 7);
+  camera.lookAt(0, -1.2, 0);
+
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: true });
+  renderer.setSize(W3, H3);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+
+  // ── Lights ──
+  const ambient = new THREE.AmbientLight(0x111133, 0.8);
+  scene.add(ambient);
+
+  const dirLight = new THREE.DirectionalLight(0x334466, 0.6);
+  dirLight.position.set(3, 5, 3);
+  scene.add(dirLight);
+
+  const glow = new THREE.PointLight(0x00e5ff, 0, 10);
+  scene.add(glow);
+
+  // ── Ground plane ──
+  const groundGeo = new THREE.PlaneGeometry(14, 14);
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x2a1a0e, roughness: 1.0, metalness: 0.0,
+    transparent: true, opacity: 0.92
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Surface grid (scan grid)
+  const gridHelper = new THREE.GridHelper(10, 24, 0x1a1a3a, 0x141430);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+
+  // Underground strata lines
+  [-0.9, -1.8, -2.7, -3.6].forEach((y, i) => {
+    const geo = new THREE.PlaneGeometry(12, 12);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x1e1e3a, transparent: true, opacity: 0.08 - i * 0.01,
+      side: THREE.DoubleSide
+    });
+    const plane = new THREE.Mesh(geo, mat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.y = y;
+    scene.add(plane);
+  });
+
+  // Surface glow ring (pulsing)
+  const surfaceRingGeo = new THREE.RingGeometry(0.05, 0.12, 64);
+  const surfaceRingMat = new THREE.MeshBasicMaterial({
+    color: 0x00e5ff, transparent: true, opacity: 0, side: THREE.DoubleSide
+  });
+  const surfaceRing = new THREE.Mesh(surfaceRingGeo, surfaceRingMat);
+  surfaceRing.rotation.x = -Math.PI / 2;
+  surfaceRing.position.y = 0.02;
+  scene.add(surfaceRing);
+
+  // ── Scan pulse rings ──
+  const pulsePool = [];
+  let pulseTimer = 0;
+
+  function spawnPulse(signal) {
+    const geo = new THREE.RingGeometry(0.05, 0.14, 48);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff, transparent: true, opacity: 0.7 * signal, side: THREE.DoubleSide
+    });
+    const ring = new THREE.Mesh(geo, mat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.02;
+    ring.userData = { life: 1.0, speed: 0.05 + signal * 0.04 };
+    scene.add(ring);
+    pulsePool.push(ring);
+  }
+
+  function updatePulses(signal) {
+    pulseTimer++;
+    const interval = Math.max(12, Math.round(40 - signal * 30));
+    if (pulseTimer % interval === 0 && signal > 0.05) spawnPulse(signal);
+
+    for (let i = pulsePool.length - 1; i >= 0; i--) {
+      const r = pulsePool[i];
+      r.userData.life -= 0.022;
+      const s = 1 + (1 - r.userData.life) * 6;
+      r.scale.set(s, s, 1);
+      r.material.opacity = Math.max(0, r.userData.life * 0.5 * signal);
+      if (r.userData.life <= 0) {
+        scene.remove(r);
+        r.geometry.dispose();
+        r.material.dispose();
+        pulsePool.splice(i, 1);
+      }
+    }
+  }
+
+  // ── Target mesh ──
+  let targetMesh = null;
+  let targetY = -0.5;
+  let currentVDIShape = null;
+
+  const SHAPES = {
+    iron:    () => new THREE.SphereGeometry(0.42, 10, 10),
+    mineral: () => new THREE.OctahedronGeometry(0.5, 1),
+    gold:    () => new THREE.CylinderGeometry(0.52, 0.52, 0.09, 40),
+    silver:  () => new THREE.CylinderGeometry(0.46, 0.46, 0.07, 40),
+  };
+
+  const MATS = {
+    iron:    { color: 0x7a5c4a, roughness: 0.9, metalness: 0.5 },
+    mineral: { color: 0x4e342e, roughness: 1.0, metalness: 0.0 },
+    gold:    { color: 0xffd54f, roughness: 0.15, metalness: 0.95 },
+    silver:  { color: 0xdde0e3, roughness: 0.08, metalness: 1.0  },
+  };
+
+  const LIGHT_COLORS = {
+    iron:    0xff5533, mineral: 0x885533,
+    gold:    0xffcc00, silver:  0x88ccff,
+  };
+
+  function vdiToShape(vdi) {
+    if (vdi < -15) return 'iron';
+    if (vdi < 5)   return 'mineral';
+    if (vdi < 40)  return 'gold';
+    return 'silver';
+  }
+
+  function rebuildTarget(shape) {
+    if (targetMesh) {
+      scene.remove(targetMesh);
+      targetMesh.geometry.dispose();
+      targetMesh.material.dispose();
+      targetMesh = null;
+    }
+    const geo = SHAPES[shape]();
+    const cfg = MATS[shape];
+    const mat = new THREE.MeshStandardMaterial({
+      color: cfg.color, roughness: cfg.roughness, metalness: cfg.metalness,
+      emissive: new THREE.Color(cfg.color).multiplyScalar(0.05),
+    });
+    targetMesh = new THREE.Mesh(geo, mat);
+    targetMesh.castShadow = true;
+    scene.add(targetMesh);
+    currentVDIShape = shape;
+  }
+
+  // Depth line (vertical dashed effect using small boxes)
+  const depthLine = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 4.2, 8),
+    new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0 })
+  );
+  depthLine.position.set(0.65, -1.8, 0);
+  scene.add(depthLine);
+
+  // Depth marker (small horizontal cross)
+  const markerGeo = new THREE.BoxGeometry(0.35, 0.025, 0.025);
+  const markerMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0 });
+  const depthMarker = new THREE.Mesh(markerGeo, markerMat);
+  scene.add(depthMarker);
+
+  // ── Particle sparks ──
+  const SPARK_COUNT = 60;
+  const sparkGeo = new THREE.BufferGeometry();
+  const sparkPos = new Float32Array(SPARK_COUNT * 3);
+  const sparkVel = [];
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    sparkPos[i*3] = sparkPos[i*3+1] = sparkPos[i*3+2] = 9999;
+    sparkVel.push({ x:0, y:0, z:0, life:0 });
+  }
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+  const sparkMat = new THREE.PointsMaterial({
+    color: 0x00e5ff, size: 0.06, transparent: true, opacity: 0.0, sizeAttenuation: true
+  });
+  const sparks = new THREE.Points(sparkGeo, sparkMat);
+  scene.add(sparks);
+  let sparkActive = false;
+
+  function triggerSparks(shape) {
+    const col = LIGHT_COLORS[shape] || 0x00e5ff;
+    sparkMat.color.setHex(col);
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 0.03 + Math.random() * 0.06;
+      sparkVel[i] = {
+        x: Math.cos(a) * sp, y: 0.04 + Math.random() * 0.05,
+        z: Math.sin(a) * sp, life: 1.0
+      };
+    }
+    sparkActive = true;
+  }
+
+  function updateSparks(ty) {
+    if (!sparkActive) return;
+    let anyAlive = false;
+    const pos = sparkGeo.attributes.position.array;
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      const v = sparkVel[i];
+      if (v.life > 0) {
+        anyAlive = true;
+        pos[i*3]   += v.x;
+        pos[i*3+1] += v.y;
+        pos[i*3+2] += v.z;
+        v.y -= 0.004;
+        v.life -= 0.025;
+        if (v.life <= 0) { pos[i*3] = pos[i*3+1] = pos[i*3+2] = 9999; }
+      }
+    }
+    sparkGeo.attributes.position.needsUpdate = true;
+    sparkMat.opacity = anyAlive ? 0.85 : 0;
+    if (!anyAlive) sparkActive = false;
+  }
+
+  // ── Main 3D update called from render loop ──
+  let lastDetecting = false;
+  let lastShape = null;
+
+  window.update3D = function() {
+    const signal   = state.signal / 100;
+    const detecting = state.signal > 3;
+    const depth    = Math.max(0, Math.min(60, state.depth));
+    const vdi      = state.vdi;
+    const shape    = vdiToShape(vdi);
+
+    // Rebuild mesh on type change
+    if (detecting && shape !== currentVDIShape) {
+      rebuildTarget(shape);
+      if (lastShape !== null) triggerSparks(shape);
+      lastShape = shape;
+    }
+
+    // Smooth target Y position: depth 0→y=-0.4, depth 60→y=-3.8
+    const wantY = detecting ? (-0.4 - (depth / 60) * 3.4) : (targetY - 0.08);
+    targetY += (wantY - targetY) * 0.06;
+
+    if (targetMesh) {
+      targetMesh.position.y = targetY;
+      targetMesh.rotation.y += 0.018;
+
+      // Scale in/out with signal
+      const sc = detecting ? (0.4 + signal * 0.6) : Math.max(0, targetMesh.scale.x - 0.04);
+      targetMesh.scale.set(sc, sc, sc);
+
+      // Emissive glow
+      const col = new THREE.Color(MATS[currentVDIShape]?.color || 0xffffff);
+      targetMesh.material.emissive = col.clone().multiplyScalar(signal * 0.35);
+
+      // Point light follows target
+      glow.position.copy(targetMesh.position);
+      glow.color.setHex(LIGHT_COLORS[currentVDIShape] || 0x00e5ff);
+      glow.intensity = detecting ? signal * 2.5 : glow.intensity * 0.9;
+    }
+
+    // Surface ring pulse
+    surfaceRingMat.opacity = detecting ? (0.3 + Math.sin(Date.now() * 0.005) * 0.2) * signal : 0;
+    const sr = 1 + signal * 0.5 + Math.sin(Date.now() * 0.004) * 0.1;
+    surfaceRing.scale.set(sr, sr, 1);
+
+    // Depth line
+    depthLine.material.opacity = detecting ? signal * 0.5 : 0;
+    depthLine.position.y = targetY / 2 + 0.1;
+    depthLine.scale.y = Math.abs(targetY) / 4.2;
+    depthMarker.position.set(0.65, targetY, 0);
+    depthMarker.material.opacity = detecting ? signal * 0.8 : 0;
+
+    // Scan pulses
+    updatePulses(signal);
+
+    // Spark update
+    if (sparkActive) {
+      sparks.position.set(0, targetY, 0);
+      updateSparks(targetY);
+    }
+
+    // 3D info label
+    const info3d = document.getElementById('info3d');
+    const NAMES = { iron:'⚠ FERREUX', mineral:'◈ MINERAI', gold:'★ OR', silver:'◆ ARGENT/CU' };
+    if (detecting) {
+      info3d.textContent = `${NAMES[shape]} · ${depth} cm de profondeur · signal ${state.signal}%`;
+      info3d.style.color = 'var(--accent)';
+    } else {
+      info3d.textContent = 'EN ATTENTE DE SIGNAL';
+      info3d.style.color = 'var(--muted)';
+    }
+
+    lastDetecting = detecting;
+    renderer.render(scene, camera);
+  };
+})();
+
+
+function loop() {
+  drawRadar(state.signal / 100);
+  updateUI();
+  if (window.update2DMap) update2DMap();
+  if (window.update3D) update3D();
+  requestAnimationFrame(loop);
+}
+
+loop();
+log('Prêt. BLE: Android Chrome | iOS: WebBLE non supporté', 'info');
+</script>
+</body>
+</html>
